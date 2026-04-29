@@ -19,8 +19,8 @@ services:
         git config --global --add safe.directory '*' &&
         chown -R vcst:vcst . || true &&
         mkdir -p storage/framework/{sessions,views,cache} storage/logs bootstrap/cache &&
-        chown -R vcst:www-data storage bootstrap/cache || true &&
-        chmod -R 775 storage bootstrap/cache || true &&
+        chown -R vcst:www-data storage bootstrap/cache database || true &&
+        chmod -R 775 storage bootstrap/cache database || true &&
         echo '📦 Installing PHP dependencies...' &&
         composer install --no-interaction --optimize-autoloader &&
         if [ -f package.json ]; then
