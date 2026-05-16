@@ -1,0 +1,61 @@
+###############################################################################
+# NGINX CONFIGURATION TEMPLATE
+# Project: ${FOLDER_PROJECT_NAME}
+###############################################################################
+
+upstream php_fpm {
+    server app:9000;
+}
+
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html/${FOLDER_PROJECT_NAME}/public;
+    index index.php index.html;
+
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-Content-Type-Options "nosniff";
+
+    charset utf-8;
+    client_max_body_size 100M;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+        add_header 'Access-Control-Allow-Origin' '*' always;
+    }
+
+    location ^~ /livewire {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_pass php_fpm;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+        
+        # Ensure Laravel knows we are on HTTPS (if behind Cloudflare)
+        fastcgi_param HTTPS on;
+
+        fastcgi_buffers 16 16k;
+        fastcgi_buffer_size 32k;
+
+        fastcgi_read_timeout 600;
+        fastcgi_connect_timeout 600;
+        fastcgi_send_timeout 600;
+    }
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires max;
+        log_not_found off;
+        add_header 'Access-Control-Allow-Origin' '*' always;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}

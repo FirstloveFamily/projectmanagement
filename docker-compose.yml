@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     image: ${FOLDER_PROJECT_NAME}_app_image
     container_name: ${FOLDER_PROJECT_NAME}_app
-    restart: unless-stopped
+    restart: "no"
     ports:
       - "9000"
     working_dir: /usr/share/nginx/html/${FOLDER_PROJECT_NAME}
@@ -19,8 +19,8 @@ services:
         git config --global --add safe.directory '*' &&
         chown -R vcst:vcst . || true &&
         mkdir -p storage/framework/{sessions,views,cache} storage/logs bootstrap/cache &&
-        chown -R vcst:www-data storage bootstrap/cache database || true &&
-        chmod -R 775 storage bootstrap/cache database || true &&
+        chown -R vcst:www-data storage bootstrap/cache || true &&
+        chmod -R 775 storage bootstrap/cache || true &&
         echo '📦 Installing PHP dependencies...' &&
         composer install --no-interaction --optimize-autoloader &&
         if [ -f package.json ]; then
@@ -40,7 +40,7 @@ services:
         php artisan filament:assets || true &&
         php artisan optimize || true &&
         php artisan filament:optimize || true &&
-        if [ "$APP_ENV" = "production" ] || [ "$APP_ENV" = "prod" ]; then
+        if [ \"$APP_ENV\" = \"production\" ] || [ \"$APP_ENV\" = \"prod\" ]; then
             echo '🚀 Production mode detected: Disabling OPcache validate_timestamps for max performance...' &&
             sed -i 's/opcache.validate_timestamps=[0-9]/opcache.validate_timestamps=0/g' /usr/local/etc/php/conf.d/docker-php.ini;
         else
@@ -63,14 +63,26 @@ services:
       context: .
       dockerfile: Dockerfile
     image: ${FOLDER_PROJECT_NAME}_app_image
-    container_name: ${FOLDER_PROJECT_NAME}_worker
+    deploy:
+      replicas: 2
+    # container_name: ${FOLDER_PROJECT_NAME}_worker
     restart: unless-stopped
     working_dir: /usr/share/nginx/html/${FOLDER_PROJECT_NAME}
     volumes:
       - .:/usr/share/nginx/html/${FOLDER_PROJECT_NAME}
     depends_on:
       - app
-    command: sh -c "until [ -f vendor/autoload.php ]; do echo 'Waiting for composer install...'; sleep 5; done && echo 'Composer dependencies found. Starting worker...' && php artisan queue:work --verbose --tries=3 --timeout=90"
+    command: >
+      sh -c "
+        until [ -f vendor/autoload.php ]; do
+          echo 'Waiting for composer install...';
+          sleep 5;
+        done;
+        echo '📦 Composer dependencies found. Waiting for system setup...';
+        sleep 10;
+        echo '🚀 Starting worker...';
+        php artisan queue:work --verbose --tries=3 --timeout=180
+      "
     env_file:
       - .env
     networks:
@@ -90,7 +102,19 @@ services:
       - .:/usr/share/nginx/html/${FOLDER_PROJECT_NAME}
     depends_on:
       - app
-    command: sh -c "until [ -f vendor/autoload.php ]; do echo 'Waiting for composer install...'; sleep 5; done && echo 'Composer dependencies found. Starting scheduler...' && while [ true ]; do php artisan schedule:run --no-interaction & sleep 60; done"
+    command: >
+      sh -c "
+        until [ -f vendor/autoload.php ]; do
+          sleep 5;
+        done;
+        sleep 10;
+        echo '⏰ Starting scheduler...';
+        php artisan schedule:clear-cache;
+        while [ true ]; do
+          php artisan schedule:run --no-interaction &
+          sleep 60;
+        done
+      "
     env_file:
       - .env
     environment:
@@ -100,23 +124,19 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  serve:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: ${FOLDER_PROJECT_NAME}_app_image
-    container_name: ${FOLDER_PROJECT_NAME}_serve
+  nginx:
+    image: nginx:stable-alpine
+    container_name: ${FOLDER_PROJECT_NAME}_nginx
     restart: unless-stopped
-    working_dir: /usr/share/nginx/html/${FOLDER_PROJECT_NAME}
+    ports:
+      - "80"
     volumes:
       - .:/usr/share/nginx/html/${FOLDER_PROJECT_NAME}
+      - ./nginx.conf.template:/etc/nginx/templates/default.conf.template
+    environment:
+      - FOLDER_PROJECT_NAME=${FOLDER_PROJECT_NAME}
     depends_on:
       - app
-    ports:
-      - "${APP_SERVE_PORT}:8000"
-    command: sh -c "until [ -f vendor/autoload.php ]; do echo 'Waiting for composer install...'; sleep 5; done && php artisan serve --host=0.0.0.0 --port=8000"
-    env_file:
-      - .env
     networks:
       - itc-network
     extra_hosts:
