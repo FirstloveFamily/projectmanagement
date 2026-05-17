@@ -4,7 +4,7 @@
 ###############################################################################
 
 upstream php_fpm {
-    server app:9000;
+    server ${FOLDER_PROJECT_NAME}_app:9000;
 }
 
 server {
