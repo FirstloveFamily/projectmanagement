@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     image: ${FOLDER_PROJECT_NAME}_app_image
     container_name: ${FOLDER_PROJECT_NAME}_app
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "9000"
     working_dir: /usr/share/nginx/html/${FOLDER_PROJECT_NAME}
