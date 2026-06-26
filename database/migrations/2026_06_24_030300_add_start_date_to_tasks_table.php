@@ -1,0 +1,46 @@
+<?php
+
+use App\Models\Task;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('tasks', function (Blueprint $table) {
+            $table->date('start_date')->nullable()->after('priority');
+        });
+
+        Task::query()
+            ->chunkById(100, function ($tasks): void {
+                foreach ($tasks as $task) {
+                    if ($task->start_date !== null) {
+                        continue;
+                    }
+
+                    $fallbackStartDate = $task->due_date?->toDateString() ?? $task->created_at?->toDateString();
+
+                    if ($fallbackStartDate !== null) {
+                        $task->forceFill([
+                            'start_date' => $fallbackStartDate,
+                        ])->save();
+                    }
+                }
+            });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('tasks', function (Blueprint $table) {
+            $table->dropColumn('start_date');
+        });
+    }
+};
