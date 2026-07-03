@@ -2,53 +2,230 @@
 
 namespace App\Models;
 
-// 1. เพิ่มการเรียกใช้ Class ที่จำเป็นสำหรับ Filament
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Panel;
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-// 2. เพิ่ม implements FilamentUser เข้าไป
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    public const ROLE_ADMIN = 'admin';
+    public const ROLE_IT_DEV = 'it_dev';
+    public const ROLE_IT_TEST = 'it_test';
+
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_SUSPENDED = 'suspended';
+
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    // 3. ตอนนี้ Panel จะถูกเรียกใช้ได้อย่างถูกต้องแล้ว
+        // 3. ตอนนี้ Panel จะถูกเรียกใช้ได้อย่างถูกต้องแล้ว
     public function canAccessPanel(Panel $panel): bool
     {
         // บังคับ true ไว้ก่อนเพื่อให้ผ่าน 403
         return true;
     }
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
     protected $fillable = [
         'name',
         'email',
-        'department',
+        'role',
+        'status',
         'password',
     ];
 
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var list<string>
+     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    public function projects(): \Illuminate\Database\Eloquent\Relations\HasMany
-    {
-        return $this->hasMany(Project::class, 'created_by');
-    }
-
-    public function tasks(): \Illuminate\Database\Eloquent\Relations\HasMany
-    {
-        return $this->hasMany(Task::class, 'assigned_to');
-    }
-
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Built-in role options for the frontend.
+     *
+     * @return array<string, string>
+     */
+    public static function roleLabels(): array
+    {
+        return [
+            self::ROLE_ADMIN => 'Admin',
+            self::ROLE_IT_DEV => 'IT DEV',
+            self::ROLE_IT_TEST => 'IT DEV (Read Only)',
+        ];
+    }
+
+    /**
+     * Built-in status options for the frontend.
+     *
+     * @return array<string, string>
+     */
+    public static function statusLabels(): array
+    {
+        return [
+            self::STATUS_ACTIVE => 'Active',
+            self::STATUS_PENDING => 'Pending',
+            self::STATUS_SUSPENDED => 'Suspended',
+        ];
+    }
+
+    /**
+     * Normalize a role value into a safe label.
+     */
+    public static function roleLabel(?string $role): string
+    {
+        $role = trim((string) $role);
+
+        if ($role === '') {
+            return 'Unknown';
+        }
+
+        return static::roleLabels()[$role] ?? $role;
+    }
+
+    /**
+     * Normalize a status value into a safe label.
+     */
+    public static function statusLabel(?string $status): string
+    {
+        $status = trim((string) $status);
+
+        if ($status === '') {
+            return 'Unknown';
+        }
+
+        return static::statusLabels()[$status] ?? $status;
+    }
+
+    /**
+     * Check whether the user has the given role.
+     */
+    public function hasRole(string $role): bool
+    {
+        return $this->role === $role;
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->hasRole(self::ROLE_ADMIN);
+    }
+
+    public function isItDev(): bool
+    {
+        return $this->hasRole(self::ROLE_IT_DEV);
+    }
+
+    public function isItTest(): bool
+    {
+        return $this->hasRole(self::ROLE_IT_TEST);
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE;
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
+    public function isSuspended(): bool
+    {
+        return $this->status === self::STATUS_SUSPENDED;
+    }
+
+    /**
+     * Resolve frontend permissions from the current role.
+     *
+     * @return array<string, bool>
+     */
+    public function permissions(): array
+    {
+        if ($this->isAdmin()) {
+            return [
+                'view-dashboard' => true,
+                'view-projects' => true,
+                'view-companies' => true,
+                'view-reports' => true,
+                'manage-users' => true,
+                'manage-companies' => true,
+                'manage-projects' => true,
+                'manage-tasks' => true,
+                'manage-trainings' => true,
+                'manage-requests' => true,
+                'manage-settings' => true,
+            ];
+        }
+
+        if ($this->isItDev()) {
+            return [
+                'view-dashboard' => true,
+                'view-projects' => true,
+                'view-companies' => true,
+                'view-reports' => true,
+                'manage-users' => false,
+                'manage-companies' => true,
+                'manage-projects' => true,
+                'manage-tasks' => true,
+                'manage-trainings' => true,
+                'manage-requests' => true,
+                'manage-settings' => false,
+            ];
+        }
+
+        return [
+            'view-dashboard' => true,
+            'view-projects' => true,
+            'view-companies' => true,
+            'view-reports' => true,
+            'manage-users' => false,
+            'manage-companies' => false,
+            'manage-projects' => false,
+            'manage-tasks' => false,
+            'manage-trainings' => false,
+            'manage-requests' => false,
+            'manage-settings' => false,
+        ];
+    }
+
+    /**
+     * Check a named frontend ability.
+     */
+    public function hasPermission(string $ability): bool
+    {
+        return $this->permissions()[$ability] ?? false;
+    }
+
+    /**
+     * Get projects owned by the user.
+     */
+    public function projects(): HasMany
+    {
+        return $this->hasMany(Project::class);
     }
 }

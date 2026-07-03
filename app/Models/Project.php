@@ -11,42 +11,67 @@ class Project extends Model
 {
     use HasFactory;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
     protected $fillable = [
         'company_id',
+        'user_id',
         'name',
-        'slug',
         'description',
-        'start_date',
-        'end_date',
+        'objective',
+        'risk',
+        'notes',
+        'source_request_id',
         'status',
-        'progress',
-        'is_public',
-        'created_by',
+        'start_date',
+        'due_date',
     ];
 
-    public function company(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    /**
+     * The attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'start_date' => 'date',
+            'due_date' => 'date',
+        ];
+    }
+
+    /**
+     * Get the user that owns the project.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the company that owns the project.
+     */
+    public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
     }
 
-    protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
-        'is_public' => 'boolean',
-    ];
-
-    public function creator(): BelongsTo
+    /**
+     * Get the request that created the project.
+     */
+    public function sourceRequest(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(SystemRequest::class, 'source_request_id');
     }
 
+    /**
+     * Get the tasks for the project.
+     */
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
-    }
-
-    public function reviews(): HasMany
-    {
-        return $this->hasMany(ProjectReview::class);
     }
 }

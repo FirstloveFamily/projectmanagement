@@ -10,14 +10,19 @@ class Company extends Model
 {
     use HasFactory;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
     protected $fillable = [
         'name',
-        'logo',
-        'address',
-        'phone',
-        'email',
+        'description',
     ];
 
+    /**
+     * Get the projects for the company.
+     */
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class);
